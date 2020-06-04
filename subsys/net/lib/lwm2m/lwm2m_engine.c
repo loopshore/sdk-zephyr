@@ -169,6 +169,8 @@ static struct lwm2m_engine_obj_inst *get_engine_obj_inst(int obj_id,
 /* Shared set of in-flight LwM2M messages */
 static struct lwm2m_message messages[CONFIG_LWM2M_ENGINE_MAX_MESSAGES];
 
+static s64_t last_msg_sent_time_ms = -1;
+
 /* for debugging: to print IP addresses */
 char *lwm2m_sprint_ip_addr(const struct sockaddr *addr)
 {
@@ -1015,12 +1017,25 @@ cleanup:
 	return r;
 }
 
+void reopen_sockets(struct lwm2m_ctx *client_ctx);
+
 int lwm2m_send_message(struct lwm2m_message *msg)
 {
 	if (!msg || !msg->ctx) {
 		LOG_ERR("LwM2M message is invalid.");
 		return -EINVAL;
 	}
+
+
+	if (last_msg_sent_time_ms >= 0) {
+		s64_t reftime = last_msg_sent_time_ms;
+		s64_t elapsed_time = k_uptime_delta(&reftime);
+
+		if (elapsed_time > 55 * 1000) {
+			reopen_sockets(msg->ctx);
+		}
+	}
+	last_msg_sent_time_ms = k_uptime_get();
 
 	if (msg->type == COAP_TYPE_CON) {
 		coap_pending_cycle(msg->pending);
@@ -4413,6 +4428,27 @@ static int lwm2m_engine_init(struct device *dev)
 	LOG_DBG("LWM2M engine socket receive thread started");
 
 	return ret;
+}
+
+void reopen_sockets(struct lwm2m_ctx *ctx) {
+	for (int i = 0; i < sock_nfds; i++) {
+		if (sock_ctx[i] == ctx) {
+			//printk("JRJR: Found sock: %d\n", sock_fds[i].fd);
+			int err = close(sock_fds[i].fd);
+			if(err) {
+				LOG_ERR("Close failed: %d", err);
+			}
+			lwm2m_socket_del(ctx);
+			err = lwm2m_socket_start(ctx);
+			if(err) {
+				LOG_ERR("lwm2m_socket_start failed: %d", err);
+				// TODO: What to do here?
+			} else {
+				LOG_DBG("Socket reopened");
+			}
+			break; // TODO: Can we have many here?
+		}
+	}
 }
 
 SYS_INIT(lwm2m_engine_init, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
