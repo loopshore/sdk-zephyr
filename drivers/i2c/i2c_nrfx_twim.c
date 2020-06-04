@@ -79,7 +79,7 @@ static int i2c_nrfx_twim_transfer(struct device *dev, struct i2c_msg *msgs,
 		k_sem_take(&(get_dev_data(dev)->completion_sync), K_FOREVER);
 		res = get_dev_data(dev)->res;
 		if (res != NRFX_SUCCESS) {
-			LOG_ERR("Error %d occurred for message %d", res, i);
+			//LOG_ERR("Error %d occurred for message %d", res, i);
 			ret = -EIO;
 			break;
 		}
