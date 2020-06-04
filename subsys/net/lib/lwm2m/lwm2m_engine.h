@@ -84,6 +84,11 @@ int lwm2m_send_message(struct lwm2m_message *msg);
 
 uint16_t lwm2m_get_rd_data(uint8_t *client_data, uint16_t size);
 
+// How many seconds to assume that DTLS NAT context is still functional. After this,
+// sockets are reopened to enforce DTLS resumption. 0 means feature is disabled.
+// Default is 55s.
+int lwm2m_set_dtls_nat_context_lifetime(uint32_t time_s);
+
 int lwm2m_perform_read_op(struct lwm2m_message *msg, uint16_t content_format);
 
 int lwm2m_write_handler(struct lwm2m_engine_obj_inst *obj_inst,
