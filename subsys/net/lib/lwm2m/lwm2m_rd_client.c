@@ -416,7 +416,7 @@ static int sm_select_next_sec_inst(bool bootstrap_server,
 	}
 
 	/* store end marker, due to looping */
-	end = (i == -1 ? CONFIG_LWM2M_SECURITY_INSTANCE_COUNT : i);
+	end = (i == -1 ? CONFIG_LWM2M_SECURITY_INSTANCE_COUNT : 2);
 
 	/* loop through servers starting from the index after the current one */
 	for (i++; i < end; i++) {
