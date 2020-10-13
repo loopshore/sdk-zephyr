@@ -1017,7 +1017,7 @@ cleanup:
 	return r;
 }
 
-void reopen_sockets(struct lwm2m_ctx *client_ctx);
+int reopen_sockets(struct lwm2m_ctx *client_ctx);
 
 int lwm2m_send_message(struct lwm2m_message *msg)
 {
@@ -1032,7 +1032,10 @@ int lwm2m_send_message(struct lwm2m_message *msg)
 		s64_t elapsed_time = k_uptime_delta(&reftime);
 
 		if (elapsed_time > 55 * 1000) {
-			reopen_sockets(msg->ctx);
+			int err = reopen_sockets(msg->ctx);
+			if(err != 0) {
+				return err;
+			}
 		}
 	}
 	last_msg_sent_time_ms = k_uptime_get();
@@ -4430,10 +4433,9 @@ static int lwm2m_engine_init(struct device *dev)
 	return ret;
 }
 
-void reopen_sockets(struct lwm2m_ctx *ctx) {
+int reopen_sockets(struct lwm2m_ctx *ctx) {
 	for (int i = 0; i < sock_nfds; i++) {
 		if (sock_ctx[i] == ctx) {
-			//printk("JRJR: Found sock: %d\n", sock_fds[i].fd);
 			int err = close(sock_fds[i].fd);
 			if(err) {
 				LOG_ERR("Close failed: %d", err);
@@ -4441,14 +4443,15 @@ void reopen_sockets(struct lwm2m_ctx *ctx) {
 			lwm2m_socket_del(ctx);
 			err = lwm2m_socket_start(ctx);
 			if(err) {
-				LOG_ERR("lwm2m_socket_start failed: %d", err);
-				// TODO: What to do here?
+				LOG_DBG("lwm2m_socket_start failed: %d", err);
+				return err;
 			} else {
 				LOG_DBG("Socket reopened");
 			}
 			break; // TODO: Can we have many here?
 		}
 	}
+	return 0;
 }
 
 SYS_INIT(lwm2m_engine_init, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
