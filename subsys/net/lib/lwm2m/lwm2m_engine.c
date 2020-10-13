@@ -170,6 +170,7 @@ static struct lwm2m_engine_obj_inst *get_engine_obj_inst(int obj_id,
 static struct lwm2m_message messages[CONFIG_LWM2M_ENGINE_MAX_MESSAGES];
 
 static s64_t last_msg_sent_time_ms = -1;
+static uint32_t dtls_context_lifetime_s = 55;
 
 /* for debugging: to print IP addresses */
 char *lwm2m_sprint_ip_addr(const struct sockaddr *addr)
@@ -1019,6 +1020,11 @@ cleanup:
 
 int reopen_sockets(struct lwm2m_ctx *client_ctx);
 
+int lwm2m_set_dtls_nat_context_lifetime(uint32_t time_s) {
+	dtls_context_lifetime_s = time_s;
+	return 0;
+}
+
 int lwm2m_send_message(struct lwm2m_message *msg)
 {
 	if (!msg || !msg->ctx) {
@@ -1031,7 +1037,7 @@ int lwm2m_send_message(struct lwm2m_message *msg)
 		s64_t reftime = last_msg_sent_time_ms;
 		s64_t elapsed_time = k_uptime_delta(&reftime);
 
-		if (elapsed_time > 55 * 1000) {
+		if (dtls_context_lifetime_s > 0 && elapsed_time > dtls_context_lifetime_s * 1000) {
 			int err = reopen_sockets(msg->ctx);
 			if(err != 0) {
 				return err;
