@@ -255,7 +255,8 @@ static int package_uri_write_cb(u16_t obj_inst_id, u16_t res_id,
 
 	return 0;
 #else
-	return -EINVAL;
+	//return -EINVAL;
+	return 0;
 #endif
 }
 
