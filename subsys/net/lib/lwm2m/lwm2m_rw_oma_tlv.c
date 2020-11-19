@@ -934,10 +934,13 @@ int do_write_op_tlv(struct lwm2m_message *msg)
 	 * header.
 	 */
 	if (msg->path.obj_id == 5 && msg->path.res_id == 0) {
-		ret = do_write_op_tlv_item(msg);
+		// See https://github.com/zephyrproject-rtos/zephyr/issues/30135
+		// For no, just comment this away as we are not using resource 0 for anything
+        LOG_DBG("FW URI writing workaround");
+		/*ret = do_write_op_tlv_item(msg);
 		if (ret < 0) {
 			return ret;
-		}
+		}*/
 	}
 
 	while (true) {
