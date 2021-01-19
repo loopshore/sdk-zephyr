@@ -31,6 +31,7 @@ LOG_MODULE_REGISTER(BME280, CONFIG_SENSOR_LOG_LEVEL);
 #warning "BME280 driver enabled without any devices"
 #endif
 
+//#define PRINT_I2C_TRAFFIC
 /*
  * This driver is an example of why devices should be resolvable at
  * link time instead of only at runtime via device_get_binding().
@@ -109,6 +110,10 @@ struct bme280_reg_io {
 	bme280_reg_read_fn read;
 	bme280_reg_write_fn write;
 };
+
+static bool compensation_read = false;
+
+static int bme280_read_compensation(const struct device *dev);
 
 static inline struct bme280_data *to_data(const struct device *dev)
 {
@@ -212,14 +217,22 @@ static int bme280_reg_read_i2c(const struct device *bus,
 			       const union bme280_bus_config *bus_config,
 			       uint8_t start, uint8_t *buf, int size)
 {
-	return i2c_burst_read(bus, bus_config->i2c_addr,
+	int err = i2c_burst_read(bus, bus_config->i2c_addr,
 			      start, buf, size);
+#ifdef PRINT_I2C_TRAFFIC
+	LOG_WRN("Read %u bytes from 0x%02X", size, start);
+	LOG_HEXDUMP_WRN(buf, size, "Result");
+#endif
+	return err;
 }
 
 static int bme280_reg_write_i2c(const struct device *bus,
 				const union bme280_bus_config *bus_config,
 				uint8_t reg, uint8_t val)
 {
+#ifdef PRINT_I2C_TRAFFIC
+	LOG_WRN("Write 0x%02X to 0x%02X", val, reg);
+#endif
 	return i2c_reg_write_byte(bus, bus_config->i2c_addr,
 				  reg, val);
 }
@@ -343,6 +356,25 @@ static int bme280_sample_fetch(const struct device *dev,
 
 	adc_press = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4);
 	adc_temp = (buf[3] << 12) | (buf[4] << 4) | (buf[5] >> 4);
+
+	// Compensation data looks something like this:
+	// 43 6b 8d 64 32 00 20 95 11 d6 d0 0b a7 1b d7 ff f9 ff 8c 3c f8 c6 70 17
+	// But sometimes it looks like this:
+	// 43 6b 8d 64 32 00 20 95 11 d6 d0 0b a7 1b d7 ff f9 ff 8c 3c f8 c6 70 07
+	//                                                                      ^
+	// Reason is somewhat unknown, effect is 10mBar too low pressure.
+	// It is somehow related to 1.8V bus that is messing this up.
+	//
+	// As a workaround, if we read compensation data here instead of when the device
+	// boots up, it looks like results might be correct more often. Go figure.
+	if(!compensation_read) {
+		ret = bme280_read_compensation(dev);
+		if(ret != 0) {
+			LOG_DBG("bme280_read_compensation failed: %d", ret);
+			return ret;
+		}
+		compensation_read = true;
+	}
 
 	bme280_compensate_temp(data, adc_temp);
 	bme280_compensate_press(data, adc_press);
@@ -475,10 +507,10 @@ static int bme280_chip_init(const struct device *dev)
 		return -ENOTSUP;
 	}
 
-	err = bme280_read_compensation(dev);
+	/*err = bme280_read_compensation(dev);
 	if (err < 0) {
 		return err;
-	}
+	}*/
 
 	if (data->chip_id == BME280_CHIP_ID) {
 		err = bme280_reg_write(dev, BME280_REG_CTRL_HUM,
