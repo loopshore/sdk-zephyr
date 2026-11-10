@@ -108,7 +108,7 @@ int lwm2m_f64_to_b64(float64_value_t *f64, uint8_t *b64, size_t len)
 	}
 
 	/* sign handled later */
-	v = abs(f64->val1);
+	v = f64->val1 < 0 ? -f64->val1 : f64->val1;
 
 	/* add whole value to fraction */
 	while (v > 0) {
@@ -123,7 +123,7 @@ int lwm2m_f64_to_b64(float64_value_t *f64, uint8_t *b64, size_t len)
 	}
 
 	/* sign handled later */
-	v = abs(f64->val2);
+	v = f64->val2 < 0 ? -f64->val2 : f64->val2;
 
 	/* add decimal to fraction */
 	i = e;
